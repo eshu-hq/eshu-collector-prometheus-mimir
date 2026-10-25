@@ -1,0 +1,68 @@
+LICENSE
+  h_78a442cba0b3e6 1-21
+README.md
+  h_78a442cba0b3e6 1-84
+boundary_test.go
+  h_78a442cba0b3e6 1-117
+cmd/collector/main.go
+  h_78a442cba0b3e6 1-72
+config.example.yaml
+  h_78a442cba0b3e6 1-45
+config.go
+  h_78a442cba0b3e6 1-235
+contract.go
+  h_78a442cba0b3e6 1-76
+doc.go
+  h_78a442cba0b3e6 1-29
+facts.go
+  h_78a442cba0b3e6 1-464
+failure.go
+  h_78a442cba0b3e6 1-30
+go.mod
+  h_78a442cba0b3e6 1-9
+go.sum
+  h_78a442cba0b3e6 1-18
+grant.example.json
+  h_78a442cba0b3e6 1-46
+grant.go
+  h_78a442cba0b3e6 1-57
+handler.go
+  h_78a442cba0b3e6 1-269
+http_client.go
+  h_78a442cba0b3e6 1-470
+manifest.yaml
+  h_78a442cba0b3e6 1-45
+manifest_embed.go
+  h_78a442cba0b3e6 1-11
+manifest_grant_test.go
+  h_78a442cba0b3e6 1-154
+parity_claim_test.go
+  h_78a442cba0b3e6 1-60
+parity_helpers_test.go
+  h_78a442cba0b3e6 1-35
+parity_signals_test.go
+  h_78a442cba0b3e6 1-200
+parity_test.go
+  h_78a442cba0b3e6 1-469
+redaction.go
+  h_78a442cba0b3e6 1-88
+request.go
+  h_78a442cba0b3e6 1-80
+telemetry.go
+  h_78a442cba0b3e6 1-39
+testdata/8864-parity-prometheus-mimir.json
+  h_78a442cba0b3e6 1-679
+types.go
+  h_78a442cba0b3e6 1-226
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "53c07761b7fa431ec7c91bfbe59add83c5d8475e",
+  "prompts": {},
+  "humans": {
+    "h_78a442cba0b3e6": {
+      "author": "Allen Sanabria <asanabria6910@gmail.com>"
+    }
+  }
+}
