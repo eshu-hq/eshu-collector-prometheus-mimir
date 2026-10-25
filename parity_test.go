@@ -465,5 +465,3 @@ func TestPrometheusMimir8864ParityLiveAgreesWithCassette(t *testing.T) {
 		}
 	}
 }
-
-

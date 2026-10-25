@@ -265,5 +265,3 @@ func latencyMillis(d time.Duration) int {
 	}
 	return int(ms)
 }
-
-

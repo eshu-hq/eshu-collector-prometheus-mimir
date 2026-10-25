@@ -12,8 +12,8 @@ import (
 
 	sdk "github.com/eshu-hq/eshu-sdk/collector"
 	"github.com/eshu-hq/eshu-sdk/factschema"
-	observabilityv1 "github.com/eshu-hq/eshu-sdk/factschema/observability/v1"
 	"github.com/eshu-hq/eshu-sdk/factschema/identity"
+	observabilityv1 "github.com/eshu-hq/eshu-sdk/factschema/observability/v1"
 )
 
 // newSourceInstanceFact converts one live metric target snapshot into a
