@@ -1,0 +1,20 @@
+.github/workflows/ci.yml
+  h_78a442cba0b3e6 1-19
+config.go
+  h_78a442cba0b3e6 64-69,76-78
+grant.go
+  h_78a442cba0b3e6 24-25,27-32
+parity_signals_test.go
+  h_78a442cba0b3e6 201-279
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "88ba981e75fadf2b8ff290c1c054865492c19304",
+  "prompts": {},
+  "humans": {
+    "h_78a442cba0b3e6": {
+      "author": "Allen Sanabria <asanabria6910@gmail.com>"
+    }
+  }
+}
