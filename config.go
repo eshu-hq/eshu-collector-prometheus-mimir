@@ -61,11 +61,20 @@ func ParseSettings(raw map[string]any, claimScopeID string, getenv func(string) 
 		if err != nil {
 			return Settings{}, configErrorf("targets[%d]: %s", i, err.Error())
 		}
+		// Mirror in-tree NewClaimedSource: disabled targets are dropped
+		// before client construction, so a disabled scope is never
+		// contacted and its claim fails like an unconfigured scope.
+		if !mapped.Enabled {
+			continue
+		}
 		if _, dup := seen[mapped.ScopeID]; dup {
 			return Settings{}, configErrorf("duplicate metric target scope_id %q", mapped.ScopeID)
 		}
 		seen[mapped.ScopeID] = struct{}{}
 		targets = append(targets, mapped)
+	}
+	if len(targets) == 0 {
+		return Settings{}, configErrorf("prometheus/mimir collector requires at least one enabled target")
 	}
 	if strings.TrimSpace(claimScopeID) != "" {
 		found := false

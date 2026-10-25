@@ -198,3 +198,82 @@ func TestPrometheusMimir8864ParityGrantStubFailsClosed(t *testing.T) {
 		t.Fatalf("facts = %d, want 0 when grant denies emission", len(result.Facts))
 	}
 }
+
+// TestPrometheusMimir8864ParityDisabledTargetSkipsBeforeClient pins the
+// in-tree construction rule (source.go:53): disabled targets are dropped
+// before client construction, so a claim for a disabled scope is never
+// contacted and fails retryable with no facts, like an unconfigured scope.
+func TestPrometheusMimir8864ParityDisabledTargetSkipsBeforeClient(t *testing.T) {
+	t.Parallel()
+
+	hits := 0
+	disabledServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(disabledServer.Close)
+
+	ps := parityScopes()[0]
+	mux := http.NewServeMux()
+	ps.serve(t, mux, &paritySeen{})
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+
+	enabled := map[string]any{
+		"provider":           ps.provider,
+		"scope_id":           ps.scopeID,
+		"instance_id":        ps.instanceID,
+		"base_url":           server.URL,
+		"resource_limit":     ps.resourceLimit,
+		"enabled":            true,
+		"declared_ids":       []any{},
+		"observed_only_hint": ps.observedOnly,
+	}
+	disabled := map[string]any{
+		"provider":       ProviderMimir,
+		"scope_id":       "mimir:parity:disabled",
+		"instance_id":    "mimir-disabled",
+		"base_url":       disabledServer.URL,
+		"resource_limit": 50,
+		"enabled":        false,
+		"declared_ids":   []any{},
+	}
+	config := map[string]any{"targets": []any{enabled, disabled}}
+
+	claim := parityClaim(ps)
+	claim.Scope.ID = "mimir:parity:disabled"
+	handler := Handler{}
+	result := handler.Handle(context.Background(), Request{
+		ProtocolVersion: sdk.ProtocolVersionV1Alpha1,
+		Claim:           claim,
+		Contract:        Contract(),
+		Config:          config,
+	})
+	if result.State != sdk.ResultRetryable {
+		t.Fatalf("state = %q, want retryable for disabled scope", result.State)
+	}
+	if len(result.Facts) != 0 {
+		t.Fatalf("facts = %d, want 0 for disabled scope", len(result.Facts))
+	}
+	if hits != 0 {
+		t.Fatalf("disabled target contacted %d times, want 0 (skip before client construction)", hits)
+	}
+}
+
+// TestParseSettingsRequiresEnabledTarget pins the construction half of the
+// disabled rule: an activation config with only disabled targets is
+// rejected, mirroring in-tree "at least one enabled metric target".
+func TestParseSettingsRequiresEnabledTarget(t *testing.T) {
+	t.Parallel()
+
+	config := map[string]any{"targets": []any{map[string]any{
+		"provider":    ProviderPrometheus,
+		"scope_id":    "prometheus:parity:off",
+		"instance_id": "prometheus-off",
+		"base_url":    "http://127.0.0.1:9",
+		"enabled":     false,
+	}}}
+	if _, err := ParseSettings(config, "", nil); err == nil {
+		t.Fatal("ParseSettings(all-disabled) error = nil, want enabled-target requirement")
+	}
+}

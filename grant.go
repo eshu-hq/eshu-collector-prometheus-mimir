@@ -21,11 +21,15 @@ type GrantAuthorizer interface {
 	Authorize(kind string, schemaVersion string, scope string) error
 }
 
-// FailClosedAuthorizer denies every emission. It is the safe default until
-// the host wires the live grant registry: with no grants configured, the
+// FailClosedAuthorizer denies every emission. Attach it when the host has
+// no live grant registry wired yet: with no grants configured, the
 // producer emits nothing rather than emitting under unknown authorization.
-// The parity suite runs authorizer-free (like the in-tree first-party path);
-// any Handler with this authorizer attached must fail terminal with no facts.
+// It is NOT the shipped default: process mode relies on host grant
+// admission, and library use must attach an authorizer — a nil authorizer
+// preserves the in-tree first-party behavior (emission without a grant
+// lookup) for parity and credential-free replay. The parity suite runs
+// authorizer-free; any Handler with this authorizer attached must fail
+// terminal with no facts.
 type FailClosedAuthorizer struct{}
 
 // Authorize always denies with the reason the operator must fix.
