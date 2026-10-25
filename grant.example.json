@@ -1,0 +1,46 @@
+[
+  {
+    "expires_at": "2027-10-01T00:00:00Z",
+    "kind": "observability.source_instance",
+    "producer_id": "dev.eshu.collector.prometheus-mimir",
+    "revoked": false,
+    "schema_versions": [
+      "1.0.0"
+    ],
+    "scope": "prometheus_mimir",
+    "version": "0.1.0"
+  },
+  {
+    "expires_at": "2027-10-01T00:00:00Z",
+    "kind": "observability.observed_target",
+    "producer_id": "dev.eshu.collector.prometheus-mimir",
+    "revoked": false,
+    "schema_versions": [
+      "1.0.0"
+    ],
+    "scope": "prometheus_mimir",
+    "version": "0.1.0"
+  },
+  {
+    "expires_at": "2027-10-01T00:00:00Z",
+    "kind": "observability.observed_rule",
+    "producer_id": "dev.eshu.collector.prometheus-mimir",
+    "revoked": false,
+    "schema_versions": [
+      "1.0.0"
+    ],
+    "scope": "prometheus_mimir",
+    "version": "0.1.0"
+  },
+  {
+    "expires_at": "2027-10-01T00:00:00Z",
+    "kind": "observability.coverage_warning",
+    "producer_id": "dev.eshu.collector.prometheus-mimir",
+    "revoked": false,
+    "schema_versions": [
+      "1.0.0"
+    ],
+    "scope": "prometheus_mimir",
+    "version": "0.1.0"
+  }
+]
