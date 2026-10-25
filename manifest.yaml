@@ -1,0 +1,45 @@
+apiVersion: eshu.dev/v1alpha1
+kind: ComponentPackage
+metadata:
+  id: dev.eshu.collector.prometheus-mimir
+  name: Prometheus-Mimir collector
+  publisher: eshu-hq
+  version: 0.1.0
+spec:
+  compatibleCore: ">=0.0.5 <0.2.0"
+  componentType: collector
+  collectorKinds:
+    - prometheus_mimir
+  runtime:
+    sdkProtocol: collector-sdk/v1alpha1
+    adapter: process
+  artifacts:
+    - platform: linux/amd64
+      image: ghcr.io/eshu-hq/eshu-collector-prometheus-mimir@sha256:0000000000000000000000000000000000000000000000000000000000000000
+  emittedFacts:
+    - kind: observability.source_instance
+      payloadSchemaRef: observability.source_instance
+      schemaVersions:
+        - 1.0.0
+      sourceConfidence:
+        - reported
+    - kind: observability.observed_target
+      payloadSchemaRef: observability.observed_target
+      schemaVersions:
+        - 1.0.0
+      sourceConfidence:
+        - reported
+    - kind: observability.observed_rule
+      payloadSchemaRef: observability.observed_rule
+      schemaVersions:
+        - 1.0.0
+      sourceConfidence:
+        - reported
+    - kind: observability.coverage_warning
+      payloadSchemaRef: observability.coverage_warning
+      schemaVersions:
+        - 1.0.0
+      sourceConfidence:
+        - reported
+  telemetry:
+    metricsPrefix: eshu_dp_prometheus_mimir_
