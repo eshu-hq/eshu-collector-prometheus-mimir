@@ -38,8 +38,8 @@ no facts.
 Exact published SDK pair from
 [SDK compatibility](https://github.com/eshu-hq/eshu/blob/main/docs/public/extend/sdk-compatibility.md):
 
-- `github.com/eshu-hq/eshu-sdk/collector@v0.1.0-rc.2`
-- `github.com/eshu-hq/eshu-sdk/factschema@v0.1.0-rc.2`
+- `github.com/eshu-hq/eshu-sdk/collector@v0.1.0-rc.3`
+- `github.com/eshu-hq/eshu-sdk/factschema@v0.1.0-rc.5`
 
 No `replace` directives and no `go.work`. Verify with
 `GOPROXY=proxy.golang.org go list -m <module>@<version>` for each pin.
