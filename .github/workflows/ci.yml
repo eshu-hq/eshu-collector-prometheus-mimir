@@ -5,9 +5,9 @@
 # actionlint, ci-complete.
 #
 # There is no image lane: this repo ships no Dockerfile, so there is nothing
-# to build. When a Dockerfile lands, add the lane with the same conditions
-# the sibling collectors use (build only, no push) and extend the frozen
-# names in ci_workflow_test.go. The manifest's all-zero placeholder digest
+# to build. When a Dockerfile lands, add the lane (tracked in issue #11)
+# with the same conditions the sibling collectors use (build only, no push)
+# and extend the frozen names in ci_workflow_test.go. The manifest's all-zero placeholder digest
 # is dispositioned by TestPlaceholderImageGate, not by CI: the manifest is
 # go:embed'ed into the binary, so a committed real digest would belong to an
 # older build; the release workflow stamps the deployed digest when it lands.
