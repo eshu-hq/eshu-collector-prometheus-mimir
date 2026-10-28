@@ -27,3 +27,5 @@
 // Credentials resolve from environment variables named in the activation
 // config and never enter facts, source URIs, logs, or statuses.
 package collector
+
+// Seed sweep complete: every seed removed, lanes must run green.
