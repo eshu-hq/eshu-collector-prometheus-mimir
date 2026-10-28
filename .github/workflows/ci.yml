@@ -34,9 +34,9 @@
 #   govulncheck v1.9.0, run with -scan package (Go 1.26 SSA-safe)
 #   gosec v2.30.0, run with -no-fail; the SARIF finding count is advisory
 #   on PRs until its false-positive rate here is measured, then blocking
-#   (this repo: 1 LOW G101 false positive on the MetricRedactions constant
-#   in telemetry.go:25, triaged in the open); scheduled runs with findings
-#   already fail red
+#   (this repo: 1 LOW G101 on the MetricRedactions metric-name constant in
+#   telemetry.go, suppressed per-site with #nosec); scheduled runs with
+#   findings already fail red
 
 name: ci
 
@@ -276,8 +276,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          title="[govulncheck] findings $(date -u +%F)"
-          body="Scheduled govulncheck failed on ${{ github.sha }}. See run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}."
+          title="[govulncheck] scheduled findings"
+          body="Scheduled govulncheck failed on $(date -u +%F) commit ${{ github.sha }}. See run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}."
           open=$(gh issue list --search "$title in:title" --state open --json number --jq '.[0].number')
           if [ -n "$open" ] && [ "$open" != "null" ]; then
             gh issue comment "$open" --body "$body"
@@ -303,21 +303,22 @@ jobs:
         # generics and exits non-zero even with zero findings; the finding
         # count below is the gate. Advisory until the false-positive rate
         # here is measured; triage happens in the open, never
-        # blanket-excluded. This repo: 1 LOW G101 false positive on the
-        # MetricRedactions constant in telemetry.go:25.
+        # blanket-excluded. This repo: 1 LOW G101 on the MetricRedactions
+        # metric-name constant in telemetry.go, suppressed per-site with
+        # #nosec.
         run: |
           go install github.com/securego/gosec/v2/cmd/gosec@v2.30.0
           "$(go env GOPATH)/bin/gosec" -no-fail -fmt=sarif -out=gosec.sarif ./...
       - name: upload SARIF
-        # Non-PR events only: fork PRs cannot write code-scanning results,
-        # and continue-on-error would turn a 403 into a silent green no-op.
+        # Non-PR events only: fork PRs cannot write code-scanning results.
+        # No continue-on-error: the findings count below is the gate, and a
+        # broken upload must fail loud, not a silent green no-op.
         # The scan step above needs contents:read alone, so PR lanes still
         # run for forks on a read-only token.
         if: github.event_name != 'pull_request'
         uses: github/codeql-action/upload-sarif@8498dc4c2b27cdd99baf0f87955b29ebbf30c78d # v4.39.1
         with:
           sarif_file: gosec.sarif
-        continue-on-error: true
       - name: finding count (advisory on PR; red on scheduled findings)
         run: |
           n=$(jq '[.runs[].results[]] | length' gosec.sarif)
@@ -334,8 +335,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          title="[gosec] findings $(date -u +%F)"
-          body="Scheduled gosec failed on ${{ github.sha }}. See run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}."
+          title="[gosec] scheduled findings"
+          body="Scheduled gosec failed on $(date -u +%F) commit ${{ github.sha }}. See run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}."
           open=$(gh issue list --search "$title in:title" --state open --json number --jq '.[0].number')
           if [ -n "$open" ] && [ "$open" != "null" ]; then
             gh issue comment "$open" --body "$body"

@@ -259,6 +259,22 @@ func aggregatorProblems(run string) []string {
 	return problems
 }
 
+// stripCommentLines drops full-line comments (optional leading whitespace
+// followed by #) from a joined run text. Explanatory comments in the live
+// ci.yml text must not satisfy the executable-shape substring checks in
+// aggregatorProblems: only executable lines pin the aggregator.
+func stripCommentLines(s string) string {
+	var b strings.Builder
+	for _, line := range strings.Split(s, "\n") {
+		if strings.HasPrefix(strings.TrimLeft(line, " \t"), "#") {
+			continue
+		}
+		b.WriteString(line)
+		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
 // TestCICompleteAggregatesPerJobResults pins the aggregator shape against
 // its two historical false modes: the pre-gates shell loop over
 // join(needs.*.result) and a whole-object comparison. The live ci.yml text
@@ -275,7 +291,7 @@ func TestCICompleteAggregatesPerJobResults(t *testing.T) {
 	for _, step := range complete.Steps {
 		runs = append(runs, step.Run)
 	}
-	if problems := aggregatorProblems(strings.Join(runs, "\n")); len(problems) > 0 {
+	if problems := aggregatorProblems(stripCommentLines(strings.Join(runs, "\n"))); len(problems) > 0 {
 		t.Errorf("ci-complete aggregator breaks its contract:\n%s", strings.Join(problems, "\n"))
 	}
 
@@ -289,6 +305,34 @@ func TestCICompleteAggregatesPerJobResults(t *testing.T) {
 		if len(aggregatorProblems(run)) == 0 {
 			t.Errorf("%s: the gate accepted a violating aggregator", name)
 		}
+	}
+}
+
+// coverageFloorPattern matches the floor literal in either file: Makefile
+// (`COVERAGE_FLOOR ?= 81.9`) or ci.yml (`COVERAGE_FLOOR: "81.9"`).
+var coverageFloorPattern = regexp.MustCompile(`COVERAGE_FLOOR\s*(?:\??=\s*|:+\s*)["']?([0-9.]+)["']?`)
+
+// TestCoverageFloorParity keeps `make ci` honest: the Makefile floor and
+// the ci.yml race-job floor must name the same number, so the next floor
+// ratchet that touches one file and not the other fails this gate instead
+// of letting local and CI disagree silently.
+func TestCoverageFloorParity(t *testing.T) {
+	t.Parallel()
+	makefile, err := os.ReadFile("Makefile")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(".github/workflows/ci.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	makeFloor := coverageFloorPattern.FindStringSubmatch(string(makefile))
+	ciFloor := coverageFloorPattern.FindStringSubmatch(string(raw))
+	if len(makeFloor) < 2 || len(ciFloor) < 2 {
+		t.Fatalf("COVERAGE_FLOOR literal missing (Makefile=%q ci.yml=%q)", makeFloor, ciFloor)
+	}
+	if makeFloor[1] != ciFloor[1] {
+		t.Errorf("COVERAGE_FLOOR drift: Makefile=%s ci.yml=%s, want one shared value", makeFloor[1], ciFloor[1])
 	}
 }
 

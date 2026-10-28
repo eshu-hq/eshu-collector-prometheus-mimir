@@ -22,6 +22,7 @@ const (
 	// MetricRetries counts bounded HTTP retries.
 	MetricRetries = "eshu_dp_prometheus_mimir_retries_total"
 	// MetricRedactions counts redacted fields.
+	// #nosec G101 -- metric-name constant, not a credential
 	MetricRedactions = "eshu_dp_prometheus_mimir_redactions_total"
 	// MetricStale counts stale observations.
 	MetricStale = "eshu_dp_prometheus_mimir_stale_total"
