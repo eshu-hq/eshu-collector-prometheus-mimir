@@ -100,6 +100,39 @@ func TestManifestDeclaresTheFourObservabilityKinds(t *testing.T) {
 		if strings.Contains(artifact.Image, ":latest") {
 			t.Fatalf("artifact image %q uses a mutable tag", artifact.Image)
 		}
+		if !isPlaceholderImage(artifact.Image) {
+			t.Fatalf("artifact image %q is not the placeholder digest: do not commit a real digest "+
+				"(the manifest is embedded in the image, so it would belong to an older build); "+
+				"the release workflow stamps the deployed digest when it lands", artifact.Image)
+		}
+	}
+}
+
+// placeholderDigest is the artifact digest the repository manifest carries
+// until a release workflow lands. manifest.yaml is go:embed'ed into the
+// binary, so a digest written into it would belong to an older build than
+// the image that embeds it. This is the explicit disposition of the
+// manifest.yaml:18 zero-digest: it stays until release stamping exists,
+// and the artifact loop above fails loudly if anyone commits a real digest
+// thinking it deploys.
+const placeholderDigest = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+
+// isPlaceholderImage reports whether image names the placeholder digest.
+func isPlaceholderImage(image string) bool {
+	return strings.HasSuffix(image, "@"+placeholderDigest)
+}
+
+// TestPlaceholderImageGate pins the gate on both sides: the placeholder passes
+// and a real-looking digest fails.
+func TestPlaceholderImageGate(t *testing.T) {
+	t.Parallel()
+
+	const repo = "ghcr.io/eshu-hq/eshu-collector-prometheus-mimir@"
+	if !isPlaceholderImage(repo + placeholderDigest) {
+		t.Fatal("the placeholder digest must pass the gate")
+	}
+	if isPlaceholderImage(repo + "sha256:" + strings.Repeat("a", 64)) {
+		t.Fatal("a real-looking digest must fail the gate")
 	}
 }
 
