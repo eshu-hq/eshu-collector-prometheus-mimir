@@ -82,3 +82,5 @@ registry at install, activation, and every emission. Revocation and rollback
 follow the in-tree rehearsal plan: stop new claims, drain leases, revoke the
 four grants, restore the in-tree producer, replay from the last committed
 generation, and verify no dual authority and no lost facts.
+
+<!-- skip-proof: docs-only lane-selection probe, close unmerged -->
