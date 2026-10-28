@@ -13,10 +13,6 @@ import (
 	"testing"
 )
 
-// coreModulePath is the Eshu core module. The published SDK modules live under
-// github.com/eshu-hq/eshu-sdk, a different prefix.
-const coreModulePath = "github.com/eshu-hq/eshu/go"
-
 // TestImportBoundaryRejectsCoreAndCrossCollectorImports is the CI gate that
 // keeps a standalone collector repository standalone: no Eshu internal
 // implementation imports and no cross-collector implementation imports. Only
