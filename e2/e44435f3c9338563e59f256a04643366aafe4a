@@ -1,0 +1,14 @@
+ci_workflow_test.go
+  h_78a442cba0b3e6 112-119,187-193,436-441
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e2e44435f3c9338563e59f256a04643366aafe4a",
+  "prompts": {},
+  "humans": {
+    "h_78a442cba0b3e6": {
+      "author": "Allen Sanabria <asanabria6910@gmail.com>"
+    }
+  }
+}
