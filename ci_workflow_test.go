@@ -56,22 +56,13 @@ type workflowFile struct {
 	Concurrency map[string]any    `yaml:"concurrency"`
 	Jobs        map[string]struct {
 		Needs       needsList         `yaml:"needs"`
+		Uses        string            `yaml:"uses"`
+		With        map[string]any    `yaml:"with"`
 		Permissions map[string]string `yaml:"permissions"`
 		Timeout     int               `yaml:"timeout-minutes"`
 		Env         map[string]string `yaml:"env"`
 		Steps       []workflowStep    `yaml:"steps"`
 	} `yaml:"jobs"`
-}
-
-// stepIndex returns the position of the first step for which match is true,
-// or -1.
-func stepIndex(steps []workflowStep, match func(workflowStep) bool) int {
-	for i, step := range steps {
-		if match(step) {
-			return i
-		}
-	}
-	return -1
 }
 
 // TestCIWorkflowPinsActionsByCommitSHA keeps a moved tag from changing what
@@ -92,6 +83,12 @@ func TestCIWorkflowPinsActionsByCommitSHA(t *testing.T) {
 		t.Fatal("ci.yml defines no jobs")
 	}
 	for name, job := range workflow.Jobs {
+		// Job-level uses (the lanes reusable call) carries the same pin
+		// contract as step-level action refs: a full commit SHA, never a
+		// mutable tag.
+		if job.Uses != "" && !pinnedAction.MatchString(job.Uses) {
+			t.Errorf("job %s uses %q, want a full commit SHA pin", name, job.Uses)
+		}
 		for _, step := range job.Steps {
 			if step.Uses != "" && !pinnedAction.MatchString(step.Uses) {
 				t.Errorf("job %s uses %q, want a full commit SHA pin", name, step.Uses)
@@ -100,25 +97,74 @@ func TestCIWorkflowPinsActionsByCommitSHA(t *testing.T) {
 	}
 }
 
-// frozenCILanes are the stable org job names. Only ci-complete is ever
-// required in a ruleset, so these names must not churn. vet is a step in
-// lint, not a job; boundary stays a job (the import-boundary gate). There
-// is no image lane: this repo ships no Dockerfile (see ci.yml header).
-var frozenCILanes = []string{"changes", "lint", "test", "race", "shell", "boundary", "govulncheck", "gosec", "actionlint", "ci-complete"}
+// callerJobs are the only jobs the thin caller may define: the classifier,
+// the reusable lane bodies, and the required aggregator. The org lane names
+// (lint, test, race, shell, boundary, govulncheck, gosec, actionlint) now
+// live inside the pinned reusable at an exact SHA, so they cannot churn
+// here; ci-complete keeps its name so the ruleset never changes.
+var callerJobs = []string{"changes", "lanes", "ci-complete"}
 
-// TestCIWorkflowKeepsFrozenJobNames keeps the org lane contract: the frozen
-// names exist, and the retired vet job is gone (vet is a step in lint now).
+// effectiveLanes pins every run gate to the exact expression the retired
+// inline lanes used. A proof test must fail when the behavior it claims
+// breaks: flipping any gate to false (or widening it) turns the suite red,
+// so lane selection cannot go dark unnoticed. run-image stays false while
+// issue #11 is open (no Dockerfile).
+
+// wantUses is the single source of truth for the pinned reusable: the v2
+// merge commit whose body was verified out-of-band (fail-loud govulncheck,
+// schedule-gated gosec failure, inner timeouts). Tests that reason about
+// reusable behavior derive from this pin so a pin move fails them until
+// the new body is re-verified.
+const wantUses = "eshu-hq/.github/.github/workflows/go-collector-ci.yml@4d01ab90baf5dd77c21cc1ee6bdf701332613449"
+
+var effectiveLanes = map[string]string{
+	"run-lint":               "${{ github.event_name != 'pull_request' || needs.changes.outputs.go == 'true' || needs.changes.outputs.misc == 'true' || needs.changes.outputs.workflows == 'true' }}",
+	"run-test":               "${{ github.event_name != 'pull_request' || needs.changes.outputs.go == 'true' || needs.changes.outputs.fixtures == 'true' || needs.changes.outputs.misc == 'true' || needs.changes.outputs.workflows == 'true' }}",
+	"run-race":               "${{ github.event_name != 'pull_request' || needs.changes.outputs.go == 'true' || needs.changes.outputs.misc == 'true' || needs.changes.outputs.workflows == 'true' }}",
+	"run-shell":              "${{ github.event_name != 'pull_request' || needs.changes.outputs.shell == 'true' }}",
+	"run-image":              "false",
+	"run-boundary":           "${{ github.event_name != 'pull_request' || needs.changes.outputs.go == 'true' || needs.changes.outputs.misc == 'true' || needs.changes.outputs.workflows == 'true' }}",
+	"run-govulncheck":        "${{ github.event_name != 'pull_request' || needs.changes.outputs.go == 'true' || needs.changes.outputs.deps == 'true' || needs.changes.outputs.workflows == 'true' }}",
+	"run-gosec":              "${{ github.event_name != 'pull_request' || needs.changes.outputs.go == 'true' || needs.changes.outputs.workflows == 'true' }}",
+	"run-actionlint":         "${{ github.event_name != 'pull_request' || needs.changes.outputs.workflows == 'true' }}",
+	"boundary-command":       "go test -count=1 -run TestImportBoundaryRejectsCoreAndCrossCollectorImports .",
+	"gosec-fail-on-findings": "${{ github.event_name == 'schedule' }}",
+}
+
+// TestCIWorkflowKeepsFrozenJobNames keeps the org lane contract across the
+// reusable move (#15): the caller holds exactly its three jobs, the lanes
+// job calls the pinned v2 reusable, and every effective lane stays gated.
 func TestCIWorkflowKeepsFrozenJobNames(t *testing.T) {
 	t.Parallel()
 
 	workflow := readCIWorkflow(t)
-	for _, name := range frozenCILanes {
+	if len(workflow.Jobs) != len(callerJobs) {
+		names := make([]string, 0, len(workflow.Jobs))
+		for name := range workflow.Jobs {
+			names = append(names, name)
+		}
+		t.Errorf("ci.yml jobs = %v, want exactly %v: lane bodies live in the reusable", names, callerJobs)
+	}
+	for _, name := range callerJobs {
 		if _, ok := workflow.Jobs[name]; !ok {
-			t.Errorf("ci.yml has no %q job, want the frozen lane names %v", name, frozenCILanes)
+			t.Errorf("ci.yml has no %q job, want the caller jobs %v", name, callerJobs)
 		}
 	}
 	if _, ok := workflow.Jobs["vet"]; ok {
 		t.Errorf("ci.yml still has a %q job, want it folded into the lint lane", "vet")
+	}
+	lanes, ok := workflow.Jobs["lanes"]
+	if !ok {
+		t.Fatal("ci.yml has no lanes job")
+	}
+	if lanes.Uses != wantUses {
+		t.Errorf("lanes uses %q, want the pinned v2 reusable %q", lanes.Uses, wantUses)
+	}
+	for input, want := range effectiveLanes {
+		val, ok := lanes.With[input]
+		if !ok || fmt.Sprint(val) != want {
+			t.Errorf("lanes input %q = %v, want the exact retired gate %q", input, val, want)
+		}
 	}
 	complete, ok := workflow.Jobs["ci-complete"]
 	if !ok {
@@ -128,23 +174,34 @@ func TestCIWorkflowKeepsFrozenJobNames(t *testing.T) {
 	for _, name := range complete.Needs {
 		needed[name] = true
 	}
-	for _, name := range frozenCILanes {
-		if name == "ci-complete" {
-			continue
-		}
+	for _, name := range []string{"changes", "lanes"} {
 		if !needed[name] {
-			t.Errorf("ci-complete needs %v, want every other frozen lane %v", complete.Needs, frozenCILanes)
+			t.Errorf("ci-complete needs %v, want it to aggregate changes and lanes", complete.Needs)
 		}
 	}
 }
 
 // TestCIWorkflowSetsJobTimeouts keeps a hung runner from holding a PR open
-// forever: every lane declares a timeout.
+// forever: every job declares a timeout, except the lanes reusable call —
+// the workflow schema forbids timeout-minutes there, and each inner lane
+// carries its own timeout, which bounds the call. Inner timeouts were
+// verified out-of-band, not by this suite: direct fetch of the pinned
+// reusable (go-collector-ci.yml at 4d01ab90, 2026-10-29; the pin
+// rev-parses to the v2 tag) shows timeout-minutes on lint:141, test:174,
+// race:190, shell:217, image:229, boundary:246, govulncheck:259,
+// gosec:274, actionlint:311, ci-complete:329. If the pin moves, re-verify
+// before trusting this comment.
 func TestCIWorkflowSetsJobTimeouts(t *testing.T) {
 	t.Parallel()
 
 	workflow := readCIWorkflow(t)
 	for name, job := range workflow.Jobs {
+		if name == "lanes" {
+			if job.Timeout != 0 {
+				t.Errorf("job lanes sets timeout-minutes: the schema forbids it on reusable calls")
+			}
+			continue
+		}
 		if job.Timeout <= 0 {
 			t.Errorf("job %s sets no timeout-minutes", name)
 		}
@@ -180,6 +237,11 @@ func TestCIWorkflowPRLeanesNeedNoConfiguredSecrets(t *testing.T) {
 		var texts []string
 		for key, value := range job.Env {
 			texts = append(texts, key+"="+value)
+		}
+		// Job-level reusable inputs (the lanes gates) carry the same
+		// no-secret contract as step bodies.
+		for key, value := range job.With {
+			texts = append(texts, key+"="+fmt.Sprint(value))
 		}
 		for _, step := range job.Steps {
 			texts = append(texts, step.Run)
@@ -308,136 +370,112 @@ func TestCICompleteAggregatesPerJobResults(t *testing.T) {
 	}
 }
 
-// coverageFloorPattern matches the floor literal in either file: Makefile
-// (`COVERAGE_FLOOR ?= 81.9`) or ci.yml (`COVERAGE_FLOOR: "81.9"`).
-var coverageFloorPattern = regexp.MustCompile(`COVERAGE_FLOOR\s*(?:\??=\s*|:+\s*)["']?([0-9.]+)["']?`)
+// coverageFloorPattern matches the Makefile floor literal
+// (`COVERAGE_FLOOR ?= 81.9`). The CI side now lives in the lanes job's
+// coverage-floor reusable input, not in a race-job env block.
+var coverageFloorPattern = regexp.MustCompile(`COVERAGE_FLOOR\s*\??=\s*["']?([0-9.]+)["']?`)
 
 // TestCoverageFloorParity keeps `make ci` honest: the Makefile floor and
-// the ci.yml race-job floor must name the same number, so the next floor
-// ratchet that touches one file and not the other fails this gate instead
-// of letting local and CI disagree silently.
+// the lanes coverage-floor input must name the same number, so the next
+// floor ratchet that touches one file and not the other fails this gate
+// instead of letting local and CI disagree silently.
 func TestCoverageFloorParity(t *testing.T) {
 	t.Parallel()
 	makefile, err := os.ReadFile("Makefile")
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err := os.ReadFile(".github/workflows/ci.yml")
-	if err != nil {
-		t.Fatal(err)
+	workflow := readCIWorkflow(t)
+	lanes, ok := workflow.Jobs["lanes"]
+	if !ok {
+		t.Fatal("ci.yml has no lanes job")
 	}
 	makeFloor := coverageFloorPattern.FindStringSubmatch(string(makefile))
-	ciFloor := coverageFloorPattern.FindStringSubmatch(string(raw))
-	if len(makeFloor) < 2 || len(ciFloor) < 2 {
-		t.Fatalf("COVERAGE_FLOOR literal missing (Makefile=%q ci.yml=%q)", makeFloor, ciFloor)
+	ciFloor, ok := lanes.With["coverage-floor"]
+	if len(makeFloor) < 2 || !ok {
+		t.Fatalf("COVERAGE_FLOOR literal missing (Makefile=%q lanes=%v)", makeFloor, lanes.With["coverage-floor"])
 	}
-	if makeFloor[1] != ciFloor[1] {
-		t.Errorf("COVERAGE_FLOOR drift: Makefile=%s ci.yml=%s, want one shared value", makeFloor[1], ciFloor[1])
+	if makeFloor[1] != fmt.Sprint(ciFloor) {
+		t.Errorf("COVERAGE_FLOOR drift: Makefile=%s lanes=%v, want one shared value", makeFloor[1], ciFloor)
 	}
 }
 
-// govulnReachabilityProblems returns every way the govulncheck lane breaks
-// its schedule-only notification contract: the scan must fail loud (no
-// -no-fail, no || true, no continue-on-error) so the failure()-gated issue
-// step below it stays reachable, and the issue step must carry failure()
-// plus the schedule gate (fork-PR safety).
-func govulnReachabilityProblems(scan, issue workflowStep) []string {
+// scanFailureProblems returns every way a scan lane breaks its scheduled
+// failure contract. The scan bodies now live in the pinned reusable, so the
+// caller owns two things: the gate expression must run the scan on schedule
+// (and on the paths that can newly expose findings), and nothing in the
+// caller may quiet it (no always-false gate). Per-scan issue filing has no
+// reusable hook yet and rides an upstream follow-up; what must never break
+// is the loud failure itself.
+func scanFailureProblems(gate string, scheduleFails bool) []string {
 	var problems []string
-	for _, quiet := range []string{"-no-fail", "|| true"} {
-		if strings.Contains(scan.Run, quiet) {
-			problems = append(problems, "govulncheck scan contains "+quiet+" (the issue step is unreachable)")
-		}
+	if !strings.Contains(gate, "github.event_name != 'pull_request'") {
+		problems = append(problems, "scan gate never runs on schedule/push (missing the non-PR short-circuit)")
 	}
-	if scan.ContinueOnError {
-		problems = append(problems, "govulncheck scan sets continue-on-error (the issue step is unreachable)")
-	}
-	for _, want := range []string{"failure()", "schedule"} {
-		if !strings.Contains(issue.If, want) {
-			problems = append(problems, "govulncheck issue step if lacks "+want)
-		}
+	if !scheduleFails {
+		problems = append(problems, "scheduled findings stay green: triage has nothing loud to ride")
 	}
 	return problems
 }
 
-// TestGovulncheckIssueStepIsReachable pins the schedule-only notification
-// shape: the live ci.yml text must pass, and a quieted scan / ungated issue
-// mutant must fail (mirrors TestCICompleteAggregatesPerJobResults).
-func TestGovulncheckIssueStepIsReachable(t *testing.T) {
+// TestGovulncheckFailsLoudOnSchedule keeps the govulncheck promise: dep, Go,
+// and workflow changes scan (a Go-only change can newly reach a vulnerable
+// symbol), scheduled runs always scan, and the reusable scan fails loud by
+// construction (go-collector-ci.yml at 4d01ab90 runs
+// `govulncheck -scan package ./...` with no `|| true`, lines 256-268;
+// no quieting input exists).
+func TestGovulncheckFailsLoudOnSchedule(t *testing.T) {
 	t.Parallel()
 
 	workflow := readCIWorkflow(t)
-	job, ok := workflow.Jobs["govulncheck"]
+	lanes, ok := workflow.Jobs["lanes"]
 	if !ok {
-		t.Fatal("ci.yml has no govulncheck job")
+		t.Fatal("ci.yml has no lanes job")
 	}
-	scanIdx := stepIndex(job.Steps, func(s workflowStep) bool { return strings.Contains(s.Run, "-scan package") })
-	issueIdx := stepIndex(job.Steps, func(s workflowStep) bool { return strings.Contains(s.Run, "gh issue create") })
-	if scanIdx < 0 || issueIdx < 0 {
-		t.Fatalf("govulncheck job has no scan/issue steps (scan=%d issue=%d)", scanIdx, issueIdx)
+	gate := fmt.Sprint(lanes.With["run-govulncheck"])
+	// scheduleFails is derived, not assumed: it holds only while the
+	// caller points at the out-of-band-verified pin (fail-loud body read
+	// on 2026-10-29; the pin rev-parses to the v2 tag). A pin move flips
+	// this to false and fails the test until the new body is re-verified.
+	scheduleFails := lanes.Uses == wantUses
+	if problems := scanFailureProblems(gate, scheduleFails); len(problems) > 0 {
+		t.Errorf("govulncheck schedule gate is broken:\n%s", strings.Join(problems, "\n"))
 	}
-	if problems := govulnReachabilityProblems(job.Steps[scanIdx], job.Steps[issueIdx]); len(problems) > 0 {
-		t.Errorf("govulncheck notification is unreachable:\n%s", strings.Join(problems, "\n"))
-	}
-
-	scan := job.Steps[scanIdx]
-	scan.Run += " govulncheck -no-fail"
-	if len(govulnReachabilityProblems(scan, job.Steps[issueIdx])) == 0 {
-		t.Errorf("-no-fail scan: the gate accepted an unreachable issue step")
-	}
-	issue := job.Steps[issueIdx]
-	issue.If = ""
-	if len(govulnReachabilityProblems(job.Steps[scanIdx], issue)) == 0 {
-		t.Errorf("ungated issue step: the gate accepted a step without failure()/schedule")
-	}
-}
-
-// gosecReachabilityProblems returns every way the gosec lane breaks its
-// schedule-only notification contract: the count step must fail scheduled
-// runs that carry findings (otherwise the failure()-gated issue step below
-// it stays reachable only on paper), and the issue step must carry
-// failure() plus the schedule gate.
-func gosecReachabilityProblems(countRun string, issue workflowStep) []string {
-	var problems []string
-	if !strings.Contains(countRun, "schedule") || !strings.Contains(countRun, "exit 1") {
-		problems = append(problems, "gosec count step never fails a scheduled run with findings (the issue step is unreachable)")
-	}
-	for _, want := range []string{"failure()", "schedule"} {
-		if !strings.Contains(issue.If, want) {
-			problems = append(problems, "gosec issue step if lacks "+want)
+	for _, want := range []string{"needs.changes.outputs.deps", "needs.changes.outputs.go"} {
+		if !strings.Contains(gate, want) {
+			t.Errorf("govulncheck gate %q lacks %s: findings from those paths would go unscanned", gate, want)
 		}
 	}
-	return problems
+
+	if len(scanFailureProblems("needs.changes.outputs.deps == 'true'", true)) == 0 {
+		t.Error("PR-only gate: the gate accepted a scan that never runs on schedule")
+	}
 }
 
-// TestGosecIssueStepIsReachable pins the gosec notification shape the same
-// way: the live text must pass, and a count step that stays green on
-// scheduled findings (or an ungated issue step) must fail.
-func TestGosecIssueStepIsReachable(t *testing.T) {
+// TestGosecFailsLoudOnSchedule keeps the gosec promise: Go and workflow
+// changes scan, scheduled runs with findings fail red via the
+// gosec-fail-on-findings schedule gate, and PR runs stay advisory green.
+// Verified against the pinned reusable (go-collector-ci.yml at 4d01ab90):
+// the lane fails only under `if: inputs.gosec-fail-on-findings`
+// (lines 295-299), and the caller passes the schedule-only expression,
+// so PR runs cannot fail while scheduled findings fail red.
+func TestGosecFailsLoudOnSchedule(t *testing.T) {
 	t.Parallel()
 
 	workflow := readCIWorkflow(t)
-	job, ok := workflow.Jobs["gosec"]
+	lanes, ok := workflow.Jobs["lanes"]
 	if !ok {
-		t.Fatal("ci.yml has no gosec job")
+		t.Fatal("ci.yml has no lanes job")
 	}
-	countIdx := stepIndex(job.Steps, func(s workflowStep) bool {
-		return strings.Contains(s.Run, "gosec.sarif") && strings.Contains(s.Run, "schedule")
-	})
-	issueIdx := stepIndex(job.Steps, func(s workflowStep) bool { return strings.Contains(s.Run, "gh issue create") })
-	if countIdx < 0 || issueIdx < 0 {
-		t.Fatalf("gosec job has no count/issue steps (count=%d issue=%d)", countIdx, issueIdx)
-	}
-	if problems := gosecReachabilityProblems(job.Steps[countIdx].Run, job.Steps[issueIdx]); len(problems) > 0 {
-		t.Errorf("gosec notification is unreachable:\n%s", strings.Join(problems, "\n"))
+	gate := fmt.Sprint(lanes.With["run-gosec"])
+	failGate := fmt.Sprint(lanes.With["gosec-fail-on-findings"])
+	scheduleFails := strings.Contains(failGate, "schedule") && !strings.Contains(failGate, "false")
+	if problems := scanFailureProblems(gate, scheduleFails); len(problems) > 0 {
+		t.Errorf("gosec schedule gate is broken:\n%s", strings.Join(problems, "\n"))
 	}
 
-	if len(gosecReachabilityProblems("echo no findings", job.Steps[issueIdx])) == 0 {
-		t.Errorf("advisory-only count: the gate accepted a count step that never fails")
-	}
-	issue := job.Steps[issueIdx]
-	issue.If = ""
-	if len(gosecReachabilityProblems(job.Steps[countIdx].Run, issue)) == 0 {
-		t.Errorf("ungated issue step: the gate accepted a step without failure()/schedule")
+	if len(scanFailureProblems(gate, false)) == 0 {
+		t.Error("advisory-only schedule: the gate accepted findings that stay green on the sweep")
 	}
 }
 
