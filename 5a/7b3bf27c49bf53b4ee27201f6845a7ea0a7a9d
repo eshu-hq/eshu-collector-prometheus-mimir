@@ -1,0 +1,16 @@
+CONTRIBUTING.md
+  h_78a442cba0b3e6 27-31,36-43
+ci_workflow_test.go
+  h_78a442cba0b3e6 180-184,415-417,446-449
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5a7b3bf27c49bf53b4ee27201f6845a7ea0a7a9d",
+  "prompts": {},
+  "humans": {
+    "h_78a442cba0b3e6": {
+      "author": "Allen Sanabria <asanabria6910@gmail.com>"
+    }
+  }
+}
