@@ -109,6 +109,14 @@ var callerJobs = []string{"changes", "lanes", "ci-complete"}
 // breaks: flipping any gate to false (or widening it) turns the suite red,
 // so lane selection cannot go dark unnoticed. run-image stays false while
 // issue #11 is open (no Dockerfile).
+
+// wantUses is the single source of truth for the pinned reusable: the v2
+// merge commit whose body was verified out-of-band (fail-loud govulncheck,
+// schedule-gated gosec failure, inner timeouts). Tests that reason about
+// reusable behavior derive from this pin so a pin move fails them until
+// the new body is re-verified.
+const wantUses = "eshu-hq/.github/.github/workflows/go-collector-ci.yml@4d01ab90baf5dd77c21cc1ee6bdf701332613449"
+
 var effectiveLanes = map[string]string{
 	"run-lint":               "${{ github.event_name != 'pull_request' || needs.changes.outputs.go == 'true' || needs.changes.outputs.misc == 'true' || needs.changes.outputs.workflows == 'true' }}",
 	"run-test":               "${{ github.event_name != 'pull_request' || needs.changes.outputs.go == 'true' || needs.changes.outputs.fixtures == 'true' || needs.changes.outputs.misc == 'true' || needs.changes.outputs.workflows == 'true' }}",
@@ -149,7 +157,6 @@ func TestCIWorkflowKeepsFrozenJobNames(t *testing.T) {
 	if !ok {
 		t.Fatal("ci.yml has no lanes job")
 	}
-	const wantUses = "eshu-hq/.github/.github/workflows/go-collector-ci.yml@4d01ab90baf5dd77c21cc1ee6bdf701332613449"
 	if lanes.Uses != wantUses {
 		t.Errorf("lanes uses %q, want the pinned v2 reusable %q", lanes.Uses, wantUses)
 	}
@@ -177,11 +184,13 @@ func TestCIWorkflowKeepsFrozenJobNames(t *testing.T) {
 // TestCIWorkflowSetsJobTimeouts keeps a hung runner from holding a PR open
 // forever: every job declares a timeout, except the lanes reusable call —
 // the workflow schema forbids timeout-minutes there, and each inner lane
-// carries its own timeout, which bounds the call. Verified against the
-// pinned reusable (go-collector-ci.yml at 4d01ab90): timeout-minutes on
-// lint:141, test:174, race:190, shell:217, image:229, boundary:246,
-// govulncheck:259, gosec:274, actionlint:311, ci-complete:329 — every job
-// the caller can reach.
+// carries its own timeout, which bounds the call. Inner timeouts were
+// verified out-of-band, not by this suite: direct fetch of the pinned
+// reusable (go-collector-ci.yml at 4d01ab90, 2026-10-29; the pin
+// rev-parses to the v2 tag) shows timeout-minutes on lint:141, test:174,
+// race:190, shell:217, image:229, boundary:246, govulncheck:259,
+// gosec:274, actionlint:311, ci-complete:329. If the pin moves, re-verify
+// before trusting this comment.
 func TestCIWorkflowSetsJobTimeouts(t *testing.T) {
 	t.Parallel()
 
@@ -424,9 +433,12 @@ func TestGovulncheckFailsLoudOnSchedule(t *testing.T) {
 		t.Fatal("ci.yml has no lanes job")
 	}
 	gate := fmt.Sprint(lanes.With["run-govulncheck"])
-	// govulncheck fails loud by construction: the only question is whether
-	// the gate runs it where findings can appear.
-	if problems := scanFailureProblems(gate, true); len(problems) > 0 {
+	// scheduleFails is derived, not assumed: it holds only while the
+	// caller points at the out-of-band-verified pin (fail-loud body read
+	// on 2026-10-29; the pin rev-parses to the v2 tag). A pin move flips
+	// this to false and fails the test until the new body is re-verified.
+	scheduleFails := lanes.Uses == wantUses
+	if problems := scanFailureProblems(gate, scheduleFails); len(problems) > 0 {
 		t.Errorf("govulncheck schedule gate is broken:\n%s", strings.Join(problems, "\n"))
 	}
 	for _, want := range []string{"needs.changes.outputs.deps", "needs.changes.outputs.go"} {
