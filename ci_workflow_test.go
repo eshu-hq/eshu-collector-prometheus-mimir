@@ -177,7 +177,11 @@ func TestCIWorkflowKeepsFrozenJobNames(t *testing.T) {
 // TestCIWorkflowSetsJobTimeouts keeps a hung runner from holding a PR open
 // forever: every job declares a timeout, except the lanes reusable call —
 // the workflow schema forbids timeout-minutes there, and each inner lane
-// carries its own timeout, which bounds the call.
+// carries its own timeout, which bounds the call. Verified against the
+// pinned reusable (go-collector-ci.yml at 4d01ab90): timeout-minutes on
+// lint:141, test:174, race:190, shell:217, image:229, boundary:246,
+// govulncheck:259, gosec:274, actionlint:311, ci-complete:329 — every job
+// the caller can reach.
 func TestCIWorkflowSetsJobTimeouts(t *testing.T) {
 	t.Parallel()
 
@@ -408,7 +412,9 @@ func scanFailureProblems(gate string, scheduleFails bool) []string {
 // TestGovulncheckFailsLoudOnSchedule keeps the govulncheck promise: dep, Go,
 // and workflow changes scan (a Go-only change can newly reach a vulnerable
 // symbol), scheduled runs always scan, and the reusable scan fails loud by
-// construction (no quieting input exists).
+// construction (go-collector-ci.yml at 4d01ab90 runs
+// `govulncheck -scan package ./...` with no `|| true`, lines 256-268;
+// no quieting input exists).
 func TestGovulncheckFailsLoudOnSchedule(t *testing.T) {
 	t.Parallel()
 
@@ -437,6 +443,10 @@ func TestGovulncheckFailsLoudOnSchedule(t *testing.T) {
 // TestGosecFailsLoudOnSchedule keeps the gosec promise: Go and workflow
 // changes scan, scheduled runs with findings fail red via the
 // gosec-fail-on-findings schedule gate, and PR runs stay advisory green.
+// Verified against the pinned reusable (go-collector-ci.yml at 4d01ab90):
+// the lane fails only under `if: inputs.gosec-fail-on-findings`
+// (lines 295-299), and the caller passes the schedule-only expression,
+// so PR runs cannot fail while scheduled findings fail red.
 func TestGosecFailsLoudOnSchedule(t *testing.T) {
 	t.Parallel()
 
