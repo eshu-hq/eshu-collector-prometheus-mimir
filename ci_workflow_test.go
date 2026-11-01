@@ -107,8 +107,9 @@ var callerJobs = []string{"changes", "lanes", "ci-complete"}
 // effectiveLanes pins every run gate to the exact expression the retired
 // inline lanes used. A proof test must fail when the behavior it claims
 // breaks: flipping any gate to false (or widening it) turns the suite red,
-// so lane selection cannot go dark unnoticed. run-image stays false while
-// issue #11 is open (no Dockerfile).
+// so lane selection cannot go dark unnoticed. run-image builds the shipped
+// Dockerfile on every non-PR event and on PRs touching image inputs, Go, or
+// workflows (issue #11; the image-only skip matrix is in ci_image_lane_test.go).
 
 // wantUses is the single source of truth for the pinned reusable: the v2
 // merge commit whose body was verified out-of-band (fail-loud govulncheck,
@@ -122,7 +123,7 @@ var effectiveLanes = map[string]string{
 	"run-test":               "${{ github.event_name != 'pull_request' || needs.changes.outputs.go == 'true' || needs.changes.outputs.fixtures == 'true' || needs.changes.outputs.misc == 'true' || needs.changes.outputs.workflows == 'true' }}",
 	"run-race":               "${{ github.event_name != 'pull_request' || needs.changes.outputs.go == 'true' || needs.changes.outputs.misc == 'true' || needs.changes.outputs.workflows == 'true' }}",
 	"run-shell":              "${{ github.event_name != 'pull_request' || needs.changes.outputs.shell == 'true' }}",
-	"run-image":              "false",
+	"run-image":              "${{ github.event_name != 'pull_request' || needs.changes.outputs.image == 'true' || needs.changes.outputs.go == 'true' || needs.changes.outputs.workflows == 'true' }}",
 	"run-boundary":           "${{ github.event_name != 'pull_request' || needs.changes.outputs.go == 'true' || needs.changes.outputs.misc == 'true' || needs.changes.outputs.workflows == 'true' }}",
 	"run-govulncheck":        "${{ github.event_name != 'pull_request' || needs.changes.outputs.go == 'true' || needs.changes.outputs.deps == 'true' || needs.changes.outputs.workflows == 'true' }}",
 	"run-gosec":              "${{ github.event_name != 'pull_request' || needs.changes.outputs.go == 'true' || needs.changes.outputs.workflows == 'true' }}",
