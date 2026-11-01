@@ -32,7 +32,9 @@ the only required check. Go sources run `lint`, `test`, `race`,
 `boundary`, `govulncheck`, and `gosec`; fixtures and embedded config
 (`testdata/**`, JSON, `manifest.yaml`, `grant.example.json`) run `test`
 only; shell scripts run `shell` (vacuous until the first script lands);
-dependency changes run `govulncheck`; workflow changes run `actionlint`
+`Dockerfile` and `.dockerignore` changes run `image`, a no-push build that
+also proves the non-root user and digest-pinned bases; dependency changes
+run `govulncheck`; workflow changes run `actionlint`
 plus the Go lanes.
 
 Weekly, `govulncheck` and `gosec` run on a schedule and fail red on

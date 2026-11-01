@@ -6,10 +6,10 @@
 # govulncheck, gosec, actionlint — identical names to the retired inline
 # lanes, so no required context churns.
 #
-# There is no image lane: this repo ships no Dockerfile, so run-image stays
-# false and there is nothing to build. When a Dockerfile lands, wire
-# run-image to the image filter and add the lane (tracked in issue #11),
-# and extend the frozen names in ci_workflow_test.go. The manifest's
+# The image lane builds the shipped Dockerfile (no push) on every non-PR
+# event and on PRs that touch image inputs, Go, or workflows (issue #11);
+# an image-only PR runs that lane and nothing else. Publishing stays in
+# image-publish.yml. The manifest's
 # all-zero placeholder digest is dispositioned by TestPlaceholderImageGate,
 # not by CI: the manifest is go:embed'ed into the binary, so a committed
 # real digest would belong to an older build; the release workflow stamps
@@ -81,6 +81,7 @@ jobs:
       go: ${{ steps.filter.outputs.go }}
       fixtures: ${{ steps.filter.outputs.fixtures }}
       shell: ${{ steps.filter.outputs.shell }}
+      image: ${{ steps.filter.outputs.image }}
       deps: ${{ steps.filter.outputs.deps }}
       workflows: ${{ steps.filter.outputs.workflows }}
       misc: ${{ steps.filter.outputs.misc }}
@@ -121,6 +122,9 @@ jobs:
               - 'grant.example.json'
             shell:
               - '**/*.sh'
+            image:
+              - 'Dockerfile'
+              - '.dockerignore'
             deps:
               - 'go.mod'
               - 'go.sum'
@@ -146,6 +150,8 @@ jobs:
               - '!manifest.yaml'
               - '!grant.example.json'
               - '!**/*.sh'
+              - '!Dockerfile'
+              - '!.dockerignore'
               - '!.github/workflows/**'
 
   lanes:
@@ -175,8 +181,20 @@ jobs:
       run-test: ${{ github.event_name != 'pull_request' || needs.changes.outputs.go == 'true' || needs.changes.outputs.fixtures == 'true' || needs.changes.outputs.misc == 'true' || needs.changes.outputs.workflows == 'true' }}
       run-race: ${{ github.event_name != 'pull_request' || needs.changes.outputs.go == 'true' || needs.changes.outputs.misc == 'true' || needs.changes.outputs.workflows == 'true' }}
       run-shell: ${{ github.event_name != 'pull_request' || needs.changes.outputs.shell == 'true' }}
-      # No Dockerfile ships (issue #11): the lane stays off until one lands.
-      run-image: false
+      # Build-only proof of the shipped Dockerfile (issue #11). Push-side
+      # publishing lives in image-publish.yml.
+      run-image: ${{ github.event_name != 'pull_request' || needs.changes.outputs.image == 'true' || needs.changes.outputs.go == 'true' || needs.changes.outputs.workflows == 'true' }}
+      image-tag: eshu-collector-prometheus-mimir:ci
+      image-context: .
+      image-command: |
+        set -euo pipefail
+        user=$(docker image inspect --format '{{.Config.User}}' eshu-collector-prometheus-mimir:ci)
+        echo "image user: $user"
+        [ "$user" = "65532:65532" ]
+        from_total=$(grep -Ec '^[[:space:]]*FROM ' Dockerfile)
+        from_pinned=$(grep -Ec '^[[:space:]]*FROM [^[:space:]]+@sha256:[0-9a-f]{64}' Dockerfile)
+        echo "Dockerfile bases: $from_pinned/$from_total digest-pinned"
+        [ "$from_pinned" -eq "$from_total" ]
       run-boundary: ${{ github.event_name != 'pull_request' || needs.changes.outputs.go == 'true' || needs.changes.outputs.misc == 'true' || needs.changes.outputs.workflows == 'true' }}
       boundary-command: go test -count=1 -run TestImportBoundaryRejectsCoreAndCrossCollectorImports .
       # A Go-only change can newly reach a vulnerable symbol in an already
