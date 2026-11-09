@@ -1,84 +1,61 @@
 # eshu-collector-prometheus-mimir
 
-Eshu Prometheus-Mimir collector, extracted from the Eshu core repository.
+Status: pre-release. It isn't the live Prometheus/Mimir producer for Eshu yet, and Eshu core still owns admission and storage.
 
-**Pre-release. Holds no producer authority until its reviewed cutover
-(eshu-hq/eshu#8864, part of epic #6707).**
+This collector asks a Prometheus or Grafana Mimir target a modest question: what are you scraping, and which rules are you running? It turns the answers into facts for Eshu. Metric samples never leave the provider, because Eshu wants the shape of your metric surface, not the numbers flowing through it.
 
-The collector runs through the Eshu component-extension host with the
-`process` runner. The host writes one bounded `collector-sdk/v1alpha1` request
-to stdin and reads one result from stdout. The collector gets no Postgres,
-graph, queue, lease, reducer, API, or MCP handle, and it never imports
-`github.com/eshu-hq/eshu/go/internal/...` (`boundary_test.go` enforces this).
-The host builds the core fact envelope, validates the result, and owns claims
-and commits.
+```mermaid
+flowchart LR
+    A["Prometheus or Mimir API"] --> B["This collector"]
+    B --> C["Eshu extension host"]
+    C --> D["Eshu core"]
+```
 
-## What it collects
+In words: the provider answers, this collector translates, the host validates, and core stores. One claim (one bounded unit of work) names one metric target, and the collector reads just that target.
 
-For the metric target named by the claim it reads, through bounded REST calls:
+## Pick this up if…
 
-- `GET /api/v1/targets?state=active` (Prometheus only; Mimir exposes no
-  scrape-target state and is never asked),
-- `GET /api/v1/rules` (both providers).
+Pick it up when Eshu should know which scrape targets and recording or alerting rules a Prometheus or Mimir instance truly serves right now.
 
-It emits the four core `observability.*` kinds at schema `1.0.0`:
-`source_instance`, `observed_target`, `observed_rule`, and
-`coverage_warning`. Metric samples, raw PromQL, scrape URLs, label values,
-annotations, tenant IDs, and token values never leave the provider response:
-facts carry presence flags and SHA-256 fingerprints instead.
+Put it back down if you want metric values, ad-hoc PromQL, or a replacement for either system. It reads target and rule metadata only, and it writes nothing to the provider.
 
-Result states: `complete`; `partial` when an endpoint the target hid or does
-not support became warning facts; `retryable` for rate limits, transport
-errors, and 5xx; `terminal` for permission, bad-data, invalid configuration,
-stale-claim, grant-denied, and collector-kind failures. A failed claim emits
-no facts.
+## Fastest smoke test
 
-## Pins
+```bash
+docker run -i IMAGE < request.json
+go run ./cmd/collector < request.json > result.json
+```
 
-Exact published SDK pair from
-[SDK compatibility](https://github.com/eshu-hq/eshu/blob/main/docs/public/extend/sdk-compatibility.md):
+One request in, one result out. That's the whole serving story. Deployment details, including one quirk about seeding you'll want to know before copying a sibling's setup, live in [docs/guides/operations.md](docs/guides/operations.md).
 
-- `github.com/eshu-hq/eshu-sdk/collector@v0.1.0-rc.3`
-- `github.com/eshu-hq/eshu-sdk/factschema@v0.1.0-rc.5`
+## Reading map
 
-No `replace` directives and no `go.work`. Verify with
-`GOPROXY=proxy.golang.org go list -m <module>@<version>` for each pin.
+| Your goal | Go to |
+| --- | --- |
+| see how targets and rules become facts | [docs/architecture/README.md](docs/architecture/README.md) |
+| configure Prometheus and Mimir targets | [docs/reference/configuration.md](docs/reference/configuration.md) |
+| ship it, watch it, fix it | [docs/guides/operations.md](docs/guides/operations.md) |
 
-## Parity evidence
+Files you'll open along the way: [config.example.yaml](config.example.yaml), [grant.example.json](grant.example.json), [manifest.yaml](manifest.yaml), and the [Dockerfile](Dockerfile).
 
-`testdata/8864-parity-prometheus-mimir.json` is the cutover fixture pack
-copied verbatim from the in-tree collector (cut from a live HTTP run with
-fixed generations). `parity_test.go` replays three live `httptest` scopes
-against the extracted producer and compares scope by scope on scope ID,
-generation ID, fact-kind multiset, stable keys, and payloads (clock-owned
-`observed_at` excluded). `parity_signals_test.go` pins truncation,
-permission-hidden partial reads, retryable transport failure with bounded
-retries, stale-claim rejection, redaction, collector-kind rejection, and the
-fail-closed grant stub. Run `go test ./...` and `go vet ./...`.
+## Related repos
 
-## Operator signals
+- [eshu](https://github.com/eshu-hq/eshu): core and the extension host that runs this collector.
+- [eshu-sdk](https://github.com/eshu-hq/eshu-sdk): the collector and fact-schema modules pinned here.
+- [eshu-deploy](https://github.com/eshu-hq/eshu-deploy): deployment wiring for Eshu components.
 
-Span and counter names preserve the in-tree vocabulary verbatim
-(`telemetry.go`): `prometheus_mimir.observe`, `prometheus_mimir.fetch`,
-`eshu_dp_prometheus_mimir_fetch_duration_seconds`,
-`eshu_dp_prometheus_mimir_provider_requests_total`,
-`eshu_dp_prometheus_mimir_facts_emitted_total`,
-`eshu_dp_prometheus_mimir_rate_limited_total`,
-`eshu_dp_prometheus_mimir_retries_total`,
-`eshu_dp_prometheus_mimir_redactions_total`, and
-`eshu_dp_prometheus_mimir_stale_total`. Labels stay bounded to `provider`,
-`status_class`, `fact_kind`, and `reason`. The extension host records grant
-decisions per emission (#6709).
+## One difference to keep straight
 
-## Producer grants, revocation, and rollback
+Prometheus and Mimir share most of this collector, but not all of it. Prometheus targets get their active scrape targets read. Mimir targets skip that read entirely, because Mimir doesn't expose scrape-target state, and both still report their rules. If a Mimir activation shows no targets, that's the design talking, not a bug you need to chase.
 
-Core-owned kinds need one live #6709 grant per kind naming this producer,
-version `0.1.0`, schema `1.0.0`, and scope `prometheus_mimir`
-(`grant.example.json`, locked by `manifest_grant_test.go`). The handler ships
-a fail-closed stub (`grant.go`): with an authorizer attached, a missing grant
-fails the claim terminal with no facts; without one it preserves the in-tree
-first-party behavior for parity and replay. The host enforces the live
-registry at install, activation, and every emission. Revocation and rollback
-follow the in-tree rehearsal plan: stop new claims, drain leases, revoke the
-four grants, restore the in-tree producer, replay from the last committed
-generation, and verify no dual authority and no lost facts.
+Manifest version today is `0.1.0` for collector kind `prometheus_mimir`.
+Exact SDK pins and the publish flow sit in [docs/guides/operations.md](docs/guides/operations.md).
+If a fact kind ever changes, the manifest and [docs/architecture/README.md](docs/architecture/README.md) change together.
+
+## Developing
+
+Run `make ci` before you push. [docs/guides/operations.md](docs/guides/operations.md) has the full rundown near the end.
+
+## Contributing, security, license
+
+Contributions start at [CONTRIBUTING.md](CONTRIBUTING.md). The license is MIT, see [LICENSE](LICENSE). There's no `SECURITY.md` file in this repo.
