@@ -17,7 +17,7 @@ The `Dockerfile` builds one static binary at `/usr/local/bin/collector` on a dis
 
 The binary also carries a `seed` subcommand for the component-extension host init container: `collector seed --dest DIR [--image-ref REF]` copies this binary and the embedded `manifest.yaml` into `DIR` (which it creates), so the host can install and enable the component. `--image-ref` is provenance logging only; the deployment side still owns how the binary and manifest reach the component home. The image-publish workflow mentions copying the published digest into an activation's `seed.image` key, and that key is host-side config, not something this binary parses.
 
-Manifest identity: `dev.eshu.collector.prometheus-mimir`, version `0.1.1`, collector kind `prometheus_mimir`, platform `linux/amd64`, compatible core `>=0.0.5 <0.2.0`. The manifest's artifact image carries an all-zero placeholder digest. Use the digest from the publish job summary for anything real.
+Manifest identity: `dev.eshu.collector.prometheus-mimir`, version `0.1.2`, collector kind `prometheus_mimir`, platform `linux/amd64`, compatible core `>=0.0.5 <0.2.0`. The manifest's artifact image carries an all-zero placeholder digest. Use the digest from the publish job summary for anything real.
 
 ## Result states, translated
 
