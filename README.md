@@ -48,7 +48,7 @@ Files you'll open along the way: [config.example.yaml](config.example.yaml), [gr
 
 Prometheus and Mimir share most of this collector, but not all of it. Prometheus targets get their active scrape targets read. Mimir targets skip that read entirely, because Mimir doesn't expose scrape-target state, and both still report their rules. If a Mimir activation shows no targets, that's the design talking, not a bug you need to chase.
 
-Manifest version today is `0.1.0` for collector kind `prometheus_mimir`.
+Manifest version today is `0.1.1` for collector kind `prometheus_mimir`.
 Exact SDK pins and the publish flow sit in [docs/guides/operations.md](docs/guides/operations.md).
 If a fact kind ever changes, the manifest and [docs/architecture/README.md](docs/architecture/README.md) change together.
 

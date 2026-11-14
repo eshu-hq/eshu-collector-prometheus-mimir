@@ -25,7 +25,7 @@ const (
 	// SchemaVersion is the schema version of every emitted observability fact.
 	SchemaVersion = "1.0.0"
 	// GrantVersion is the collector artifact version the producer grants bind.
-	GrantVersion = "0.1.0"
+	GrantVersion = "0.1.1"
 	// ProviderPrometheus identifies Prometheus API evidence.
 	ProviderPrometheus = "prometheus"
 	// ProviderMimir identifies Grafana Mimir API evidence.
