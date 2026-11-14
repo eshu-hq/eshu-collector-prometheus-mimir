@@ -28,8 +28,25 @@ func TestRunSeedWritesCollectorAndManifest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("seed did not write collector: %v", err)
 	}
-	if info.Mode().Perm()&0o111 == 0 {
-		t.Fatalf("seeded collector is not executable: %v", info.Mode())
+	if info.Mode().Perm() != 0o755 {
+		t.Fatalf("seeded collector mode = %v, want 0755", info.Mode())
+	}
+	// run() seeds from the current executable, so the staged bytes must
+	// equal this test binary; a mode-only check would pass wrong bytes.
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatalf("locate test binary: %v", err)
+	}
+	want, err := os.ReadFile(self)
+	if err != nil {
+		t.Fatalf("read test binary: %v", err)
+	}
+	gotBin, err := os.ReadFile(bin)
+	if err != nil {
+		t.Fatalf("read staged collector: %v", err)
+	}
+	if !bytes.Equal(gotBin, want) {
+		t.Fatal("staged collector bytes differ from the source binary")
 	}
 	got, err := os.ReadFile(filepath.Join(dest, "manifest.yaml"))
 	if err != nil {
