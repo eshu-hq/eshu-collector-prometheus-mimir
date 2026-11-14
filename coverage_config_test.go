@@ -167,6 +167,44 @@ func TestParseSettingsBoundsScopeSelection(t *testing.T) {
 	}
 }
 
+// TestParseSettingsAcceptsActivationEnvelope pins the live-shape regression
+// (ops-qa 0-fact incident): every activation carries top-level
+// provider/scope_id envelope keys, so they must parse while a genuinely
+// unknown top-level key still fails closed.
+func TestParseSettingsAcceptsActivationEnvelope(t *testing.T) {
+	t.Parallel()
+
+	target := coverageTargetMap("prometheus-mimir:ops-qa")
+	target["instance_id"] = "ops-qa"
+	target["provider"] = "mimir"
+	target["base_url"] = "http://monitoring-mimir-gateway.monitoring.svc.cluster.local"
+	target["path_prefix"] = "/prometheus"
+	target["resource_limit"] = 50
+	target["stale_after"] = "24h"
+	target["enabled"] = true
+	envelope := map[string]any{
+		"provider": "mimir",
+		"scope_id": "prometheus-mimir:ops-qa",
+		"targets":  []any{target},
+	}
+	settings, err := ParseSettings(envelope, "prometheus-mimir:ops-qa", nil)
+	if err != nil {
+		t.Fatalf("ParseSettings(activation envelope) error = %v, want nil", err)
+	}
+	if len(settings.Targets) != 1 {
+		t.Fatalf("ParseSettings(activation envelope) targets = %d, want 1", len(settings.Targets))
+	}
+	rogue := map[string]any{
+		"provider":  "mimir",
+		"scope_id":  "prometheus-mimir:ops-qa",
+		"bogus_key": true,
+		"targets":   []any{coverageTargetMap("prometheus-mimir:ops-qa")},
+	}
+	if _, err := ParseSettings(rogue, "prometheus-mimir:ops-qa", nil); err == nil {
+		t.Error("ParseSettings(unknown top-level key) error = nil, want a failure")
+	}
+}
+
 // TestClassifiedProviderFailureBounds pins the failure taxonomy: bad_data
 // is terminal, other API errors stay retryable with their operation token,
 // auth-denied keeps its class, and unknown errors fall back to retryable.

@@ -37,10 +37,15 @@ type Settings struct {
 
 // ParseSettings validates the activation config for the claimed scope.
 // getenv resolves credential environment variables the config names. Unknown
-// keys fail closed so a misspelled limit cannot be silently ignored.
+// keys fail closed so a misspelled limit cannot be silently ignored. The
+// top-level provider/scope_id envelope keys are the one exception: every
+// activation carries them (the host addresses the claim by scope), so they
+// are accepted and the per-target claim-scope check below stays the gate.
 func ParseSettings(raw map[string]any, claimScopeID string, getenv func(string) string) (Settings, error) {
 	var decoded struct {
-		Targets []activationTargetJSON `json:"targets"`
+		Provider string                 `json:"provider"`
+		ScopeID  string                 `json:"scope_id"`
+		Targets  []activationTargetJSON `json:"targets"`
 	}
 	encoded, err := json.Marshal(raw)
 	if err != nil {
