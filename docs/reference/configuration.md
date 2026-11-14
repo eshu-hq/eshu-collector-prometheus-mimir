@@ -33,6 +33,6 @@ Give the credential only the read access the two GET endpoints need. This repo d
 
 ## Grants
 
-All four kinds are core-owned, so the host needs a live producer grant (core's permission to emit a kind it owns) per kind before it accepts these facts. [grant.example.json](../../grant.example.json) lists the four: scope `prometheus_mimir`, version `0.1.0`, schema `1.0.0`. A test, `manifest_grant_test.go`, keeps the manifest and that example locked together so they can't drift apart quietly.
+All four kinds are core-owned, so the host needs a live producer grant (core's permission to emit a kind it owns) per kind before it accepts these facts. [grant.example.json](../../grant.example.json) lists the four: scope `prometheus_mimir`, version `0.1.1`, schema `1.0.0`. A test, `manifest_grant_test.go`, keeps the manifest and that example locked together so they can't drift apart quietly.
 
 Inside the collector, the handler carries a fail-closed grant stub (see `grant.go`). With an authorizer attached, a missing grant fails the claim terminal as grant-denied with no facts. The real enforcement lives with the host, which checks the live grant registry at install, at activation, and again at emission. Think of the stub as a seatbelt, not the brakes.

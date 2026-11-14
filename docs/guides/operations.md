@@ -17,7 +17,7 @@ The `Dockerfile` builds one static binary at `/usr/local/bin/collector` on a dis
 
 Now the quirk: this binary has no `seed` subcommand. Read `cmd/collector/main.go` and you'll see it accepts only the stdio claim mode and rejects extra arguments outright. Please don't copy a `collector seed --dest ...` step from a sibling collector's deployment, because it will fail here and waste your afternoon. How the binary and `manifest.yaml` reach the component home belongs to the deployment side, not to a command in this repo. The image-publish workflow mentions copying the published digest into an activation's `seed.image` key, and that key is host-side config, not something this binary parses.
 
-Manifest identity: `dev.eshu.collector.prometheus-mimir`, version `0.1.0`, collector kind `prometheus_mimir`, platform `linux/amd64`, compatible core `>=0.0.5 <0.2.0`. The manifest's artifact image carries an all-zero placeholder digest. Use the digest from the publish job summary for anything real.
+Manifest identity: `dev.eshu.collector.prometheus-mimir`, version `0.1.1`, collector kind `prometheus_mimir`, platform `linux/amd64`, compatible core `>=0.0.5 <0.2.0`. The manifest's artifact image carries an all-zero placeholder digest. Use the digest from the publish job summary for anything real.
 
 ## Result states, translated
 
