@@ -41,6 +41,10 @@ func runSeed(args []string, stdout, stderr io.Writer) error {
 	return stageFrom(self, *dest, *imageRef, stdout)
 }
 
+// osChmod is os.Chmod behind a package seam so tests can inject a chmod
+// failure that file ownership rules make unproducible otherwise.
+var osChmod = os.Chmod
+
 // stageFrom stages the collector at selfPath plus the embedded manifest
 // into dest. It exists so tests can drive the copy path with any source,
 // including one that fails to read.
@@ -55,14 +59,14 @@ func stageFrom(selfPath, dest, imageRef string, stdout io.Writer) error {
 	}
 	// os.WriteFile applies the mode only when it creates the file, so a
 	// re-seed over files with stale modes must enforce them explicitly.
-	if err := os.Chmod(binPath, 0o755); err != nil {
+	if err := osChmod(binPath, 0o755); err != nil {
 		return fmt.Errorf("seed: chmod collector: %w", err)
 	}
 	manPath := filepath.Join(dest, "manifest.yaml")
 	if err := os.WriteFile(manPath, collector.ManifestYAML, 0o644); err != nil {
 		return fmt.Errorf("seed: write manifest.yaml: %w", err)
 	}
-	if err := os.Chmod(manPath, 0o644); err != nil {
+	if err := osChmod(manPath, 0o644); err != nil {
 		return fmt.Errorf("seed: chmod manifest.yaml: %w", err)
 	}
 	if imageRef == "" {

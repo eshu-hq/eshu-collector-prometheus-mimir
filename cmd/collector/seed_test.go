@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -86,6 +87,48 @@ func TestRunSeedReseedEnforcesModes(t *testing.T) {
 	}
 	if got := stdout.String(); got != "seeded "+dest+"\n" {
 		t.Fatalf("re-seed summary without --image-ref = %q, want no 'from' suffix", got)
+	}
+}
+
+// errWriter fails every write so tests can drive the seed report error.
+type errWriter struct{}
+
+func (errWriter) Write([]byte) (int, error) { return 0, errors.New("write boom") }
+
+func TestStageFromChmodFailure(t *testing.T) {
+	dest := t.TempDir()
+	old := osChmod
+	osChmod = func(string, os.FileMode) error { return errors.New("chmod boom") }
+	defer func() { osChmod = old }()
+	if err := stageFrom(os.Args[0], dest, "ref", io.Discard); err == nil {
+		t.Fatal("stageFrom with failing chmod must fail")
+	}
+}
+
+func TestStageFromManifestChmodFailure(t *testing.T) {
+	dest := t.TempDir()
+	old := osChmod
+	calls := 0
+	osChmod = func(path string, mode os.FileMode) error {
+		calls++
+		if calls == 2 {
+			return errors.New("chmod boom")
+		}
+		return old(path, mode)
+	}
+	defer func() { osChmod = old }()
+	if err := stageFrom(os.Args[0], dest, "ref", io.Discard); err == nil {
+		t.Fatal("stageFrom with failing manifest chmod must fail")
+	}
+}
+
+func TestStageFromReportFailure(t *testing.T) {
+	dest := t.TempDir()
+	if err := stageFrom(os.Args[0], dest, "ref", errWriter{}); err == nil {
+		t.Fatal("stageFrom with failing stdout must fail")
+	}
+	if err := stageFrom(os.Args[0], dest, "", errWriter{}); err == nil {
+		t.Fatal("stageFrom without image-ref and failing stdout must fail")
 	}
 }
 
