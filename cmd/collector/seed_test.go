@@ -55,6 +55,40 @@ func TestRunSeedRejectsExtraArgument(t *testing.T) {
 	}
 }
 
+func TestRunSeedReseedEnforcesModes(t *testing.T) {
+	dest := t.TempDir()
+	var stdout, stderr bytes.Buffer
+	if err := run(context.Background(),
+		[]string{"seed", "--dest", dest, "--image-ref", "ghcr.io/example/coll@sha256:0"},
+		nil, &stdout, &stderr, os.Getenv); err != nil {
+		t.Fatalf("seed failed: %v", err)
+	}
+	// Corrupt the modes, then re-seed: the enforced 0755/0644 must come back.
+	bin := filepath.Join(dest, "collector")
+	man := filepath.Join(dest, "manifest.yaml")
+	if err := os.Chmod(bin, 0o600); err != nil {
+		t.Fatalf("chmod fixture: %v", err)
+	}
+	if err := os.Chmod(man, 0o600); err != nil {
+		t.Fatalf("chmod fixture: %v", err)
+	}
+	stdout.Reset()
+	if err := run(context.Background(),
+		[]string{"seed", "--dest", dest},
+		nil, &stdout, &stderr, os.Getenv); err != nil {
+		t.Fatalf("re-seed failed: %v", err)
+	}
+	if info, err := os.Stat(bin); err != nil || info.Mode().Perm() != 0o755 {
+		t.Fatalf("re-seed left collector mode %v, want 0755", info.Mode())
+	}
+	if info, err := os.Stat(man); err != nil || info.Mode().Perm() != 0o644 {
+		t.Fatalf("re-seed left manifest mode %v, want 0644", info.Mode())
+	}
+	if got := stdout.String(); got != "seeded "+dest+"\n" {
+		t.Fatalf("re-seed summary without --image-ref = %q, want no 'from' suffix", got)
+	}
+}
+
 func TestRunSeedRejectsBadFlag(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	if err := run(context.Background(), []string{"seed", "--bogus"},

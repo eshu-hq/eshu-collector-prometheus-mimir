@@ -49,11 +49,27 @@ func stageFrom(selfPath, dest, imageRef string, stdout io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("seed: read binary: %w", err)
 	}
-	if err := os.WriteFile(filepath.Join(dest, "collector"), content, 0o755); err != nil {
+	binPath := filepath.Join(dest, "collector")
+	if err := os.WriteFile(binPath, content, 0o755); err != nil {
 		return fmt.Errorf("seed: write collector: %w", err)
 	}
-	if err := os.WriteFile(filepath.Join(dest, "manifest.yaml"), collector.ManifestYAML, 0o644); err != nil {
+	// os.WriteFile applies the mode only when it creates the file, so a
+	// re-seed over files with stale modes must enforce them explicitly.
+	if err := os.Chmod(binPath, 0o755); err != nil {
+		return fmt.Errorf("seed: chmod collector: %w", err)
+	}
+	manPath := filepath.Join(dest, "manifest.yaml")
+	if err := os.WriteFile(manPath, collector.ManifestYAML, 0o644); err != nil {
 		return fmt.Errorf("seed: write manifest.yaml: %w", err)
+	}
+	if err := os.Chmod(manPath, 0o644); err != nil {
+		return fmt.Errorf("seed: chmod manifest.yaml: %w", err)
+	}
+	if imageRef == "" {
+		if _, err := fmt.Fprintf(stdout, "seeded %s\n", dest); err != nil {
+			return fmt.Errorf("seed: report: %w", err)
+		}
+		return nil
 	}
 	if _, err := fmt.Fprintf(stdout, "seeded %s from %s\n", dest, imageRef); err != nil {
 		return fmt.Errorf("seed: report: %w", err)
