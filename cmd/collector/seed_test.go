@@ -107,11 +107,6 @@ func TestRunSeedReseedEnforcesModes(t *testing.T) {
 	}
 }
 
-// errWriter fails every write so tests can drive the seed report error.
-type errWriter struct{}
-
-func (errWriter) Write([]byte) (int, error) { return 0, errors.New("write boom") }
-
 func TestStageFromChmodFailure(t *testing.T) {
 	dest := t.TempDir()
 	old := osChmod
@@ -141,10 +136,10 @@ func TestStageFromManifestChmodFailure(t *testing.T) {
 
 func TestStageFromReportFailure(t *testing.T) {
 	dest := t.TempDir()
-	if err := stageFrom(os.Args[0], dest, "ref", errWriter{}); err == nil {
+	if err := stageFrom(os.Args[0], dest, "ref", failingWriter{}); err == nil {
 		t.Fatal("stageFrom with failing stdout must fail")
 	}
-	if err := stageFrom(os.Args[0], dest, "", errWriter{}); err == nil {
+	if err := stageFrom(os.Args[0], dest, "", failingWriter{}); err == nil {
 		t.Fatal("stageFrom without image-ref and failing stdout must fail")
 	}
 }
