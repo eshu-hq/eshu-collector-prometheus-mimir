@@ -26,7 +26,7 @@ docker run -i IMAGE < request.json
 go run ./cmd/collector < request.json > result.json
 ```
 
-One request in, one result out. That's the whole serving story. Deployment details, including one quirk about seeding you'll want to know before copying a sibling's setup, live in [docs/guides/operations.md](docs/guides/operations.md).
+One request in, one result out, plus a `seed` subcommand that stages the binary and manifest for the host init container. Deployment details live in [docs/guides/operations.md](docs/guides/operations.md).
 
 ## Reading map
 

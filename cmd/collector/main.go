@@ -35,7 +35,7 @@ func run(
 	getenv func(string) string,
 ) error {
 	if len(args) > 0 && args[0] == "seed" {
-		return runSeed(args[1:], stdout)
+		return runSeed(args[1:], stdout, stderr)
 	}
 	return runClaim(ctx, args, stdin, stdout, stderr, getenv, time.Now)
 }

@@ -17,12 +17,16 @@ import (
 // host init container: it stages this binary and the embedded component
 // manifest into dest so the host can install and enable the component.
 // --image-ref is accepted for provenance logging and otherwise unused.
-func runSeed(args []string, stdout io.Writer) error {
+func runSeed(args []string, stdout, stderr io.Writer) error {
 	flags := flag.NewFlagSet("seed", flag.ContinueOnError)
+	flags.SetOutput(stderr)
 	dest := flags.String("dest", "", "runtime directory to seed (required)")
 	imageRef := flags.String("image-ref", "", "seed image reference (provenance only)")
 	if err := flags.Parse(args); err != nil {
 		return err
+	}
+	if flags.NArg() > 0 {
+		return fmt.Errorf("seed: unexpected argument %q", flags.Arg(0))
 	}
 	if *dest == "" {
 		return fmt.Errorf("seed: --dest is required")

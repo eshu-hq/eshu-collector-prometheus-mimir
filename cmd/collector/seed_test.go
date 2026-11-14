@@ -47,6 +47,14 @@ func TestRunSeedRequiresDest(t *testing.T) {
 	}
 }
 
+func TestRunSeedRejectsExtraArgument(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if err := run(context.Background(), []string{"seed", "--dest", t.TempDir(), "stowaway"},
+		nil, &stdout, &stderr, os.Getenv); err == nil {
+		t.Fatal("seed with an extra positional argument must fail")
+	}
+}
+
 func TestRunSeedRejectsBadFlag(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	if err := run(context.Background(), []string{"seed", "--bogus"},
