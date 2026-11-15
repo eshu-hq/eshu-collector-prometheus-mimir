@@ -25,6 +25,6 @@ Exact pins from `go.mod`, with no `replace` directives and no `go.work`. The fil
 | `github.com/eshu-hq/eshu-sdk/factschema` | `v0.1.0-rc.12` |
 | `gopkg.in/yaml.v3` | `v3.0.1` |
 
-Go version in `go.mod`: `1.26.10`.
+Go version in `go.mod`: `1.26.11`.
 
 The manifest ([manifest.yaml](../../manifest.yaml)) stays the source of truth for this list. If a fact kind ever changes, the manifest and this page change together.
