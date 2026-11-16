@@ -12,7 +12,7 @@ New here? Start with [Getting started](getting-started/README.md), then come bac
 
 ## Guides
 
-- [Operating the Prometheus-Mimir collector](guides/operations.md) — the image and the seed that isn't, result states, troubleshooting, build and release
+- [Operating the Prometheus-Mimir collector](guides/operations.md) — the image and its seed subcommand, result states, troubleshooting, build and release
 - [All guides](guides/README.md)
 
 ## Reference

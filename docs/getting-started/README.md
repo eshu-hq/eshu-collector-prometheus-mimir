@@ -11,9 +11,9 @@ go run ./cmd/collector < request.json > result.json
 
 One request in, one result out — the whole serving story.
 
-## 2. Know the seed quirk before you deploy
+## 2. Know the seed subcommand before you deploy
 
-This binary has **no `seed` subcommand**, unlike its siblings. It accepts only the stdio claim mode and rejects extra arguments. How the binary and `manifest.yaml` reach the component home belongs to the deployment side. Read the [operations guide](../guides/operations.md) before copying a sibling's setup.
+This binary serves stdio claims and also carries a **`seed` subcommand**: `collector seed --dest DIR [--image-ref REF]` stages the binary (mode 0755) and the embedded `manifest.yaml` (mode 0644) into `DIR` for the host init container. Read the [operations guide](../guides/operations.md) before copying a sibling's setup.
 
 ## 3. Write the activation
 

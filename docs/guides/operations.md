@@ -4,20 +4,20 @@ Running this collector is mostly a matter of getting the binary and manifest to 
 
 ## How the host runs it
 
-The extension host uses its `process` runner. One `collector-sdk/v1alpha1` Request arrives on stdin, the collector reads the target the claim names, and one Result leaves on stdout. No arguments (or `--sdk-stdio`) serves one claim. That's the only serving mode you'll find.
+The extension host uses its `process` runner. One `collector-sdk/v1alpha1` Request arrives on stdin, the collector reads the target the claim names, and one Result leaves on stdout. No arguments (or `--sdk-stdio`) serves one claim. A second mode, `collector seed --dest DIR`, stages the binary and manifest for the host init container.
 
 ```bash
 docker run -i IMAGE < request.json
 go run ./cmd/collector < request.json > result.json
 ```
 
-## The image, and the seed that isn't
+## The image, and its seed subcommand
 
 The `Dockerfile` builds one static binary at `/usr/local/bin/collector` on a distroless base with no shell, running as user `65532:65532`. The entrypoint is `/usr/local/bin/collector --sdk-stdio`, so the image serves a claim the moment you feed it stdin.
 
-Now the quirk: this binary has no `seed` subcommand. Read `cmd/collector/main.go` and you'll see it accepts only the stdio claim mode and rejects extra arguments outright. Please don't copy a `collector seed --dest ...` step from a sibling collector's deployment, because it will fail here and waste your afternoon. How the binary and `manifest.yaml` reach the component home belongs to the deployment side, not to a command in this repo. The image-publish workflow mentions copying the published digest into an activation's `seed.image` key, and that key is host-side config, not something this binary parses.
+The binary also carries a `seed` subcommand for the component-extension host init container: `collector seed --dest DIR [--image-ref REF]` copies this binary and the embedded `manifest.yaml` into `DIR` (which it creates), so the host can install and enable the component. `--image-ref` is provenance logging only; the deployment side still owns how the binary and manifest reach the component home. The image-publish workflow mentions copying the published digest into an activation's `seed.image` key, and that key is host-side config, not something this binary parses.
 
-Manifest identity: `dev.eshu.collector.prometheus-mimir`, version `0.1.0`, collector kind `prometheus_mimir`, platform `linux/amd64`, compatible core `>=0.0.5 <0.2.0`. The manifest's artifact image carries an all-zero placeholder digest. Use the digest from the publish job summary for anything real.
+Manifest identity: `dev.eshu.collector.prometheus-mimir`, version `0.1.3`, collector kind `prometheus_mimir`, platform `linux/amd64`, compatible core `>=0.0.5 <0.2.0`. The manifest's artifact image carries an all-zero placeholder digest. Use the digest from the publish job summary for anything real.
 
 ## Result states, translated
 
@@ -69,4 +69,4 @@ Exact pins from `go.mod`, with no `replace` directives and no `go.work`. The fil
 | `github.com/eshu-hq/eshu-sdk/factschema` | `v0.1.0-rc.12` |
 | `gopkg.in/yaml.v3` | `v3.0.1` |
 
-Go version in `go.mod`: `1.26.10`.
+Go version in `go.mod`: `1.26.11`.
