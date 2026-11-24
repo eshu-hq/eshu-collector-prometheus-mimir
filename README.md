@@ -43,6 +43,7 @@ Files you'll open along the way: [config.example.yaml](config.example.yaml), [gr
 - [eshu](https://github.com/eshu-hq/eshu): core and the extension host that runs this collector.
 - [eshu-sdk](https://github.com/eshu-hq/eshu-sdk): the collector and fact-schema modules pinned here.
 - [eshu-deploy](https://github.com/eshu-hq/eshu-deploy): deployment wiring for Eshu components.
+- [Collector and Reducer Readiness](https://github.com/eshu-hq/eshu/blob/main/docs/public/reference/collector-reducer-readiness.md), [Start Here](https://github.com/eshu-hq/eshu/blob/main/docs/public/start-here.md), and the 31-repo [Repository Map](https://github.com/eshu-hq/eshu/blob/main/REPOSITORIES.md).
 
 ## One difference to keep straight
 
